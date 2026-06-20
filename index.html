@@ -182,19 +182,24 @@
             let hpPerangkat = document.getElementById('abs_hp').value;
             let statusKondisi = document.querySelector('input[name="abs_status"]:checked').value;
 
-            // 1. Simpan ke sistem lokal HP masing-masing biar ada riwayat di layar mereka
-            let indeksDataLama = dataLokal.findIndex(item => item.id === idPerangkat && item.tanggal === tanggalHariIni);
-            let payloadData = {
-                tanggal: tanggalHariIni,
-                jam_masuk: tipeAbsen === "Masuk" ? jamMenitIni : "-",
-                jam_pulang: tipeAbsen === "Pulang" ? jamMenitIni : "-",
-                id: idPerangkat,
-                nama: namaPerangkat,
-                jabatan: jabatanPerangkat,
-                hp: hpPerangkat,
-                status: statusKondisi,
-                tipe: tipeAbsen
-            };
+            // 2. KIRIM DATA KE GOOGLE SHEETS MENGGUNAKAN FORM SUBMIT (ANTI-BLOKIR)
+            let formBantu = document.createElement('form');
+            formBantu.method = 'POST';
+            formBantu.action = SCRIPT_URL;
+
+            let inputData = document.createElement('input');
+            inputData.type = 'hidden';
+            inputData.name = 'postData';
+            inputData.value = JSON.stringify(payloadData);
+            
+            formBantu.appendChild(inputData);
+            document.body.appendChild(formBantu);
+            
+            // Kirim langsung
+            formBantu.submit();
+            
+            alert("Sukses! Absen " + tipeAbsen + " Anda berhasil diproses ke Google Sheets Pusat.");
+            resetFormSetelahSukses();
 
             if (tipeAbsen === "Pulang" && indeksDataLama !== -1) {
                 dataLokal[indeksDataLama].jam_pulang = jamMenitIni;
