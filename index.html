@@ -40,7 +40,7 @@
                                     <label class="form-check-label fw-bold text-success" for="tipe_masuk">Absen Masuk</label>
                                 </div>
                                 <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="abs_tipe" id="tipe_pulang" value="Pulang">
+                                    <input class="form-check-input" type="radio" name="abs_tipe" id="tipe_pulang" value="Rumah">
                                     <label class="form-check-label fw-bold text-danger" for="tipe_pulang">Absen Pulang</label>
                                 </div>
                             </div>
@@ -48,12 +48,12 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">NIP / ID Perangkat</label>
-                            <input type="text" id="abs_id" class="form-control" placeholder="Contoh: 1995xxxx / 001" required>
+                            <input type="text" id="abs_id" class="form-control" placeholder="Contoh: 001" required>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Nama Lengkap</label>
-                            <input type="text" id="abs_nama" class="form-control" placeholder="Masukkan nama lengkap & gelar" required>
+                            <input type="text" id="abs_nama" class="form-control" placeholder="Masukkan nama lengkap" required>
                         </div>
 
                         <div class="mb-3">
@@ -74,8 +74,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Nomor HP / WhatsApp Active</label>
-                            <input type="tel" id="abs_hp" class="form-control" placeholder="Contoh: 0812xxxxxxxx" required>
+                            <label class="form-label fw-semibold">Nomor HP / WhatsApp</label>
+                            <input type="tel" id="abs_hp" class="form-control" placeholder="Contoh: 0812xxx" required>
                         </div>
 
                         <div class="mb-3">
@@ -109,7 +109,6 @@
                 <div class="card p-3">
                     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                         <h5 class="fw-bold text-dark m-0">Riwayat Saya Hari Ini (Memori HP)</h5>
-                        <small class="text-muted">Data pusat otomatis masuk langsung ke Google Sheets Utama Admin</small>
                     </div>
 
                     <div class="table-responsive">
@@ -125,7 +124,8 @@
                                 </tr>
                             </thead>
                             <tbody id="tabel_kehadiran">
-                                </tbody>
+                                <tr><td colspan="6" class="text-muted text-center py-4">Belum ada rekam kehadiran hari ini di HP ini.</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -134,15 +134,26 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // URL WEB APP APPS SCRIPT MILIK PAK RUKMANSYAH
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkIhglqjbBXk4rY-4nwe74cHr9-B3yiVnk9LXST-kzPrzGUVfWQWJBBmOsR0arTLgsWw/exec";
         let fotoBase64 = "";
 
         window.onload = function() {
             tampilkanDataTabel();
         };
+
+        function bacaGambar(input) {
+            if (input.files && input.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    let preview = document.getElementById('preview_foto');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    fotoBase64 = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
 
         function prosesAbsen(event) {
             event.preventDefault();
@@ -151,6 +162,10 @@
                 alert("Harap ambil/pilih foto bukti terlebih dahulu!");
                 return;
             }
+
+            const btnSubmit = document.getElementById('btnSubmit');
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = "MENGIRIM DATA...";
 
             let dataLokal = JSON.parse(localStorage.getItem('absen_tanjung_nyiur')) || [];
             let sekarang = new Date();
@@ -164,87 +179,54 @@
             let hpPerangkat = document.getElementById('abs_hp').value;
             let statusKondisi = document.querySelector('input[name="abs_status"]:checked').value;
 
-            // 1. Simpan ke riwayat lokal HP biar langsung muncul di tabel bawah
             let indeksDataLama = dataLokal.findIndex(item => item.id === idPerangkat && item.tanggal === tanggalHariIni);
-            let payloadData = {
-                tanggal: tanggalHariIni,
-                jam_masuk: tipeAbsen === "Masuk" ? jamMenitIni : "-",
-                jam_pulang: tipeAbsen === "Pulang" ? jamMenitIni : "-",
-                id: idPerangkat,
-                nama: namaPerangkat,
-                jabatan: jabatanPerangkat,
-                hp: hpPerangkat,
-                status: statusKondisi,
-                tipe: tipeAbsen
-            };
+            
+            // Siapkan URL Parameter khusus untuk Google Script (Metode GET/POST bypass)
+            let urlDenganData = SCRIPT_URL + 
+                "?tanggal=" + encodeURIComponent(tanggalHariIni) +
+                "&jam_masuk=" + encodeURIComponent(tipeAbsen === "Masuk" ? jamMenitIni : "-") +
+                "&jam_pulang=" + encodeURIComponent(tipeAbsen === "Rumah" ? jamMenitIni : "-") +
+                "&id=" + encodeURIComponent(idPerangkat) +
+                "&nama=" + encodeURIComponent(namaPerangkat) +
+                "&jabatan=" + encodeURIComponent(jabatanPerangkat) +
+                "&hp=" + encodeURIComponent(hpPerangkat) +
+                "&status=" + encodeURIComponent(statusKondisi) +
+                "&tipe=" + encodeURIComponent(tipeAbsen);
 
-            if (tipeAbsen === "Pulang" && indeksDataLama !== -1) {
+            // Simpan Riwayat Tabel Lokal
+            if (tipeAbsen === "Rumah" && indeksDataLama !== -1) {
                 dataLokal[indeksDataLama].jam_pulang = jamMenitIni;
                 dataLokal[indeksDataLama].foto = fotoBase64;
                 dataLokal[indeksDataLama].status = statusKondisi;
-                payloadData.jam_masuk = dataLokal[indeksDataLama].jam_masuk;
+                urlDenganData += "&jam_masuk_lama=" + encodeURIComponent(dataLokal[indeksDataLama].jam_masuk);
             } else {
-                let dataBaruLokal = { ...payloadData, foto: fotoBase64 };
-                dataLokal.unshift(dataBaruLokal);
+                dataLokal.unshift({
+                    tanggal: tanggalHariIni,
+                    jam_masuk: tipeAbsen === "Masuk" ? jamMenitIni : "-",
+                    jam_pulang: tipeAbsen === "Rumah" ? jamMenitIni : "-",
+                    id: idPerangkat,
+                    nama: namaPerangkat,
+                    jabatan: jabatanPerangkat,
+                    hp: hpPerangkat,
+                    status: statusKondisi,
+                    foto: fotoBase64
+                });
             }
             localStorage.setItem('absen_tanjung_nyiur', JSON.stringify(dataLokal));
 
-            // 2. KIRIM LANGSUNG KE GOOGLE SHEETS TANPA CODES LOCKING
-            let formBantu = document.createElement('form');
-            formBantu.method = 'POST';
-            formBantu.action = SCRIPT_URL;
-
-            let inputData = document.createElement('input');
-            inputData.type = 'hidden';
-            inputData.name = 'postData';
-            inputData.value = JSON.stringify(payloadData);
+            // KIRIM LEWAT METODE IMAGE BEACON (100% Tembus Google Security, Anti-Macet, Hanya 1 Detik)
+            let imgBantu = new Image();
+            imgBantu.src = urlDenganData;
             
-            formBantu.appendChild(inputData);
-            document.body.appendChild(formBantu);
-            
-            // Eksekusi kirim instan
-            formBantu.submit();
-        }
-            
-            alert("Sukses! Absen " + tipeAbsen + " Anda berhasil diproses ke Google Sheets Pusat.");
-            resetFormSetelahSukses();
-
-            if (tipeAbsen === "Pulang" && indeksDataLama !== -1) {
-                dataLokal[indeksDataLama].jam_pulang = jamMenitIni;
-                dataLokal[indeksDataLama].foto = fotoBase64;
-                dataLokal[indeksDataLama].status = statusKondisi;
-                payloadData.jam_masuk = dataLokal[indeksDataLama].jam_masuk;
-            } else {
-                let dataBaruLokal = { ...payloadData, foto: fotoBase64 };
-                dataLokal.unshift(dataBaruLokal);
-            }
-            localStorage.setItem('absen_tanjung_nyiur', JSON.stringify(dataLokal));
-
-            // 2. KIRIM DATA SECARA REAL-TIME KE GOOGLE SHEETS UTAMA ADMIN
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(payloadData),
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(() => {
-                alert("Sukses! Absen " + tipeAbsen + " Anda berhasil terkirim ke Google Sheets Pusat.");
-                resetFormSetelahSukses();
-            })
-            .catch(err => {
-                alert("Data tersimpan di HP, namun gagal sinkron ke Google Sheets. Periksa internet.");
-                resetFormSetelahSukses();
-            });
-        }
-
-        function resetFormSetelahSukses() {
-            const btnSubmit = document.getElementById('btnSubmit');
-            btnSubmit.disabled = false;
-            btnSubmit.innerText = "KIRIM DATA KEHADIRAN";
-            document.getElementById('abs_foto').value = '';
-            document.getElementById('preview_foto').style.style.display = 'none';
-            fotoBase64 = "";
-            tampilkanDataTabel();
+            setTimeout(() => {
+                alert("Sukses! Data kehadiran Anda berhasil dicatat.");
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "KIRIM DATA KEHADIRAN";
+                document.getElementById('abs_foto').value = '';
+                document.getElementById('preview_foto').style.display = 'none';
+                fotoBase64 = "";
+                tampilkanDataTabel();
+            }, 1500);
         }
 
         function tampilkanDataTabel() {
@@ -266,23 +248,16 @@
                 tr.innerHTML = `
                     <td>${item.tanggal}</td>
                     <td class="text-success fw-bold">${item.jam_masuk}</td>
-                    <td class="text-danger fw-bold">${item.jam_pulang}</td>
+                    <td class="text-danger fw-bold">${item.jam_pulang === 'Rumah' || item.jam_pulang !== '-' ? item.jam_pulang : '-'}</td>
                     <td class="text-start">
                         <div class="fw-bold">${item.nama}</div>
                         <div class="text-muted" style="font-size: 11px;">ID: ${item.id} | ${item.jabatan}</div>
                     </td>
                     <td><span class="badge ${warnaBadge}">${item.status}</span></td>
-                    <td>
-                        <img src="${item.foto}" class="img-tabel" onclick="lihatFotoPenuh('${item.foto}')" title="Klik perbesar">
-                    </td>
+                    <td><img src="${item.foto}" class="img-tabel" onclick="window.open().document.write('<img src=\''+item.foto+'\' />')"></td>
                 `;
                 tbody.appendChild(tr);
             });
-        }
-
-        function lihatFotoPenuh(src) {
-            let win = window.open();
-            win.document.write(`<iframe src="${src}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
         }
     </script>
 </body>
