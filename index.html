@@ -144,19 +144,6 @@
             tampilkanDataTabel();
         };
 
-        function bacaGambar(input) {
-            if (input.files && input.files[0]) {
-                let reader = new FileReader();
-                reader.onload = function(e) {
-                    let preview = document.getElementById('preview_foto');
-                    preview.src = e.target.result;
-                    preview.style.display = 'block';
-                    fotoBase64 = e.target.result;
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
         function prosesAbsen(event) {
             event.preventDefault();
             
@@ -164,11 +151,6 @@
                 alert("Harap ambil/pilih foto bukti terlebih dahulu!");
                 return;
             }
-
-            // Kunci tombol biar tidak diklik dua kali saat loading
-            const btnSubmit = document.getElementById('btnSubmit');
-            btnSubmit.disabled = true;
-            btnSubmit.innerText = "MENGIRIM DATA KE GOOGLE SHEETS...";
 
             let dataLokal = JSON.parse(localStorage.getItem('absen_tanjung_nyiur')) || [];
             let sekarang = new Date();
@@ -182,7 +164,32 @@
             let hpPerangkat = document.getElementById('abs_hp').value;
             let statusKondisi = document.querySelector('input[name="abs_status"]:checked').value;
 
-            // 2. KIRIM DATA KE GOOGLE SHEETS MENGGUNAKAN FORM SUBMIT (ANTI-BLOKIR)
+            // 1. Simpan ke riwayat lokal HP biar langsung muncul di tabel bawah
+            let indeksDataLama = dataLokal.findIndex(item => item.id === idPerangkat && item.tanggal === tanggalHariIni);
+            let payloadData = {
+                tanggal: tanggalHariIni,
+                jam_masuk: tipeAbsen === "Masuk" ? jamMenitIni : "-",
+                jam_pulang: tipeAbsen === "Pulang" ? jamMenitIni : "-",
+                id: idPerangkat,
+                nama: namaPerangkat,
+                jabatan: jabatanPerangkat,
+                hp: hpPerangkat,
+                status: statusKondisi,
+                tipe: tipeAbsen
+            };
+
+            if (tipeAbsen === "Pulang" && indeksDataLama !== -1) {
+                dataLokal[indeksDataLama].jam_pulang = jamMenitIni;
+                dataLokal[indeksDataLama].foto = fotoBase64;
+                dataLokal[indeksDataLama].status = statusKondisi;
+                payloadData.jam_masuk = dataLokal[indeksDataLama].jam_masuk;
+            } else {
+                let dataBaruLokal = { ...payloadData, foto: fotoBase64 };
+                dataLokal.unshift(dataBaruLokal);
+            }
+            localStorage.setItem('absen_tanjung_nyiur', JSON.stringify(dataLokal));
+
+            // 2. KIRIM LANGSUNG KE GOOGLE SHEETS TANPA CODES LOCKING
             let formBantu = document.createElement('form');
             formBantu.method = 'POST';
             formBantu.action = SCRIPT_URL;
@@ -195,8 +202,9 @@
             formBantu.appendChild(inputData);
             document.body.appendChild(formBantu);
             
-            // Kirim langsung
+            // Eksekusi kirim instan
             formBantu.submit();
+        }
             
             alert("Sukses! Absen " + tipeAbsen + " Anda berhasil diproses ke Google Sheets Pusat.");
             resetFormSetelahSukses();
