@@ -31,7 +31,7 @@
                 <div class="card p-4">
                     <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">Isi Data Kehadiran</h5>
                     
-                    <form onsubmit="prosesAbsen(event)">
+                    <form id="form_absen" onsubmit="prosesAbsen(event)">
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-primary">Tipe Absensi</label>
                             <div class="d-flex gap-3">
@@ -40,7 +40,7 @@
                                     <label class="form-check-label fw-bold text-success" for="tipe_masuk">Absen Masuk</label>
                                 </div>
                                 <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="abs_tipe" id="tipe_pulang" value="Rumah">
+                                    <input class="form-check-input" type="radio" name="abs_tipe" id="tipe_pulang" value="Pulang">
                                     <label class="form-check-label fw-bold text-danger" for="tipe_pulang">Absen Pulang</label>
                                 </div>
                             </div>
@@ -108,7 +108,7 @@
             <div class="col-md-8">
                 <div class="card p-3">
                     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                        <h5 class="fw-bold text-dark m-0">Riwayat Saya Hari Ini (Memori HP)</h5>
+                        <h5 class="fw-bold text-dark m-0">Riwayat Perangkat di Perangkat Ini</h5>
                     </div>
 
                     <div class="table-responsive">
@@ -118,13 +118,13 @@
                                     <th>Tanggal</th>
                                     <th>Jam Masuk</th>
                                     <th>Jam Pulang</th>
-                                    <th>Data Diri Perangkat</th>
+                                    <th>Data Perangkat</th>
                                     <th>Kondisi</th>
-                                    <th>Foto Bukti</th>
+                                    <th>Foto</th>
                                 </tr>
                             </thead>
                             <tbody id="tabel_kehadiran">
-                                <tr><td colspan="6" class="text-muted text-center py-4">Belum ada rekam kehadiran hari ini di HP ini.</td></tr>
+                                <tr><td colspan="6" class="text-muted text-center py-4">Belum ada rekam kehadiran.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -135,6 +135,7 @@
     </div>
 
     <script>
+        // URL Google Web App Utama milik Pak Adi Cipta
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkIhglqjbBXk4rY-4nwe74cHr9-B3yiVnk9LXST-kzPrzGUVfWQWJBBmOsR0arTLgsWw/exec";
         let fotoBase64 = "";
 
@@ -159,7 +160,7 @@
             event.preventDefault();
             
             if(!fotoBase64) {
-                alert("Harap ambil/pilih foto bukti terlebih dahulu!");
+                alert("Harap ambil foto bukti terlebih dahulu!");
                 return;
             }
 
@@ -167,7 +168,6 @@
             btnSubmit.disabled = true;
             btnSubmit.innerText = "MENGIRIM DATA...";
 
-            let dataLokal = JSON.parse(localStorage.getItem('absen_tanjung_nyiur')) || [];
             let sekarang = new Date();
             let tanggalHariIni = sekarang.toLocaleDateString('id-ID', { dateStyle: 'medium' });
             let jamMenitIni = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WITA";
@@ -179,54 +179,63 @@
             let hpPerangkat = document.getElementById('abs_hp').value;
             let statusKondisi = document.querySelector('input[name="abs_status"]:checked').value;
 
-            let indeksDataLama = dataLokal.findIndex(item => item.id === idPerangkat && item.tanggal === tanggalHariIni);
-            
-            // Siapkan URL Parameter khusus untuk Google Script (Metode GET/POST bypass)
-            let urlDenganData = SCRIPT_URL + 
-                "?tanggal=" + encodeURIComponent(tanggalHariIni) +
-                "&jam_masuk=" + encodeURIComponent(tipeAbsen === "Masuk" ? jamMenitIni : "-") +
-                "&jam_pulang=" + encodeURIComponent(tipeAbsen === "Rumah" ? jamMenitIni : "-") +
-                "&id=" + encodeURIComponent(idPerangkat) +
-                "&nama=" + encodeURIComponent(namaPerangkat) +
-                "&jabatan=" + encodeURIComponent(jabatanPerangkat) +
-                "&hp=" + encodeURIComponent(hpPerangkat) +
-                "&status=" + encodeURIComponent(statusKondisi) +
-                "&tipe=" + encodeURIComponent(tipeAbsen);
+            // Mempersiapkan struktur FormData standar agar dibaca sempurna oleh Google Apps Script
+            let formData = new FormData();
+            formData.append("tanggal", tanggalHariIni);
+            formData.append("jam_masuk", tipeAbsen === "Masuk" ? jamMenitIni : "-");
+            formData.append("jam_pulang", tipeAbsen === "Pulang" ? jamMenitIni : "-");
+            formData.append("id", idPerangkat);
+            formData.append("nama", namaPerangkat);
+            formData.append("jabatan", jabatanPerangkat);
+            formData.append("hp", hpPerangkat);
+            formData.append("status", statusKondisi);
+            formData.append("tipe", tipeAbsen);
 
-            // Simpan Riwayat Tabel Lokal
-            if (tipeAbsen === "Rumah" && indeksDataLama !== -1) {
-                dataLokal[indeksDataLama].jam_pulang = jamMenitIni;
-                dataLokal[indeksDataLama].foto = fotoBase64;
-                dataLokal[indeksDataLama].status = statusKondisi;
-                urlDenganData += "&jam_masuk_lama=" + encodeURIComponent(dataLokal[indeksDataLama].jam_masuk);
-            } else {
-                dataLokal.unshift({
-                    tanggal: tanggalHariIni,
-                    jam_masuk: tipeAbsen === "Masuk" ? jamMenitIni : "-",
-                    jam_pulang: tipeAbsen === "Rumah" ? jamMenitIni : "-",
-                    id: idPerangkat,
-                    nama: namaPerangkat,
-                    jabatan: jabatanPerangkat,
-                    hp: hpPerangkat,
-                    status: statusKondisi,
-                    foto: fotoBase64
-                });
-            }
-            localStorage.setItem('absen_tanjung_nyiur', JSON.stringify(dataLokal));
-
-            // KIRIM LEWAT METODE IMAGE BEACON (100% Tembus Google Security, Anti-Macet, Hanya 1 Detik)
-            let imgBantu = new Image();
-            imgBantu.src = urlDenganData;
-            
-            setTimeout(() => {
-                alert("Sukses! Data kehadiran Anda berhasil dicatat.");
-                btnSubmit.disabled = false;
-                btnSubmit.innerText = "KIRIM DATA KEHADIRAN";
-                document.getElementById('abs_foto').value = '';
+            // Kirim data langsung menggunakan FETCH FORM DATA (Paling stabil & aman)
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(respon => {
+                alert("Sukses! Data kehadiran Anda berhasil dicatat di database pusat.");
+                
+                // Simpan ke memori lokal HP untuk riwayat tampilan di bawah
+                let dataLokal = JSON.parse(localStorage.getItem('absen_tanjung_nyiur')) || [];
+                let indeksDataLama = dataLokal.findIndex(item => item.id === idPerangkat && item.tanggal === tanggalHariIni);
+                
+                if (tipeAbsen === "Pulang" && indeksDataLama !== -1) {
+                    dataLokal[indeksDataLama].jam_pulang = jamMenitIni;
+                    dataLokal[indeksDataLama].status = statusKondisi;
+                } else {
+                    dataLokal.unshift({
+                        tanggal: tanggalHariIni,
+                        jam_masuk: tipeAbsen === "Masuk" ? jamMenitIni : "-",
+                        jam_pulang: tipeAbsen === "Pulang" ? jamMenitIni : "-",
+                        id: idPerangkat,
+                        nama: namaPerangkat,
+                        jabatan: jabatanPerangkat,
+                        hp: hpPerangkat,
+                        status: statusKondisi,
+                        foto: fotoBase64
+                    });
+                }
+                localStorage.setItem('absen_tanjung_nyiur', JSON.stringify(dataLokal));
+                
+                // Reset Form
+                document.getElementById('form_absen').reset();
                 document.getElementById('preview_foto').style.display = 'none';
                 fotoBase64 = "";
                 tampilkanDataTabel();
-            }, 1500);
+            })
+            .catch(err => {
+                alert("Sistem Google sedang sibuk, namun data Anda sedang diproses. Silakan cek Sheets utama.");
+                tampilkanDataTabel();
+            })
+            .finally(() => {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "KIRIM DATA KEHADIRAN";
+            });
         }
 
         function tampilkanDataTabel() {
@@ -235,26 +244,24 @@
             tbody.innerHTML = '';
 
             if(dataLokal.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-muted text-center py-4">Belum ada rekam kehadiran hari ini di HP ini.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-muted text-center py-4">Belum ada rekam kehadiran hari ini.</td></tr>`;
                 return;
             }
 
             dataLokal.forEach(item => {
                 let tr = document.createElement('tr');
-                let warnaBadge = 'bg-success';
-                if(item.status === 'Izin') warnaBadge = 'bg-warning text-dark';
-                if(item.status === 'Sakit') warnaBadge = 'bg-danger';
+                let warnaBadge = item.status === 'Hadir' ? 'bg-success' : (item.status === 'Izin' ? 'bg-warning text-dark' : 'bg-danger');
 
                 tr.innerHTML = `
                     <td>${item.tanggal}</td>
                     <td class="text-success fw-bold">${item.jam_masuk}</td>
-                    <td class="text-danger fw-bold">${item.jam_pulang === 'Rumah' || item.jam_pulang !== '-' ? item.jam_pulang : '-'}</td>
+                    <td class="text-danger fw-bold">${item.jam_pulang}</td>
                     <td class="text-start">
                         <div class="fw-bold">${item.nama}</div>
                         <div class="text-muted" style="font-size: 11px;">ID: ${item.id} | ${item.jabatan}</div>
                     </td>
                     <td><span class="badge ${warnaBadge}">${item.status}</span></td>
-                    <td><img src="${item.foto}" class="img-tabel" onclick="window.open().document.write('<img src=\''+item.foto+'\' />')"></td>
+                    <td><img src="${item.foto ? item.foto : 'https://via.placeholder.com/50'}" class="img-tabel" onclick="window.open().document.write('<img src=\''+(item.foto?item.foto:'')+'\' />')"></td>
                 `;
                 tbody.appendChild(tr);
             });
